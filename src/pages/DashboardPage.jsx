@@ -9,14 +9,60 @@ function DashboardPage({
   currentCycleInstallmentTotal,
   borrowerTotals,
   borrowers,
-  currentCycleTransactions
+  currentCycleTransactions,
+  creditLimit,
+  remainingCredit,
+  creditUtilization
 }) {
   const borrowerRanking = borrowers
     .map((name) => ({ name, ...(borrowerTotals[name] || { due: 0, count: 0 }) }))
     .sort((a, b) => b.due - a.due);
 
+  const hasCreditLimit = typeof creditLimit === 'number' && creditLimit > 0;
+  const safeRemaining = typeof remainingCredit === 'number' ? remainingCredit : 0;
+  const safeUtilization = typeof creditUtilization === 'number' ? creditUtilization : 0;
+
+  let utilizationClassName = 'meta';
+  if (hasCreditLimit) {
+    if (safeUtilization >= 80) {
+      utilizationClassName = 'meta text-danger';
+    } else if (safeUtilization >= 50) {
+      utilizationClassName = 'meta text-warning';
+    } else {
+      utilizationClassName = 'meta text-success';
+    }
+  }
+
   return (
     <div className="page dashboard-page">
+      {hasCreditLimit && (
+        <section className="summary-row">
+          <article>
+            <p className="label">Global Credit Limit</p>
+            <p className="value">{formatCurrency(creditLimit)}</p>
+            <p className="meta">Shared across all borrowers and users</p>
+          </article>
+          <article>
+            <p className="label">Remaining Credit</p>
+            <p className="value">{formatCurrency(safeRemaining)}</p>
+            <p className="meta">
+              {safeRemaining < 0 ? 'Over your limit' : 'Available within your limit'}
+            </p>
+          </article>
+          <article>
+            <p className="label">Utilization</p>
+            <p className="value">{`${safeUtilization.toFixed(0)}%`}</p>
+            <p className={utilizationClassName}>
+              {safeUtilization >= 80
+                ? 'High usage of your limit'
+                : safeUtilization >= 50
+                  ? 'Moderate usage of your limit'
+                  : 'Comfortable usage of your limit'}
+            </p>
+          </article>
+        </section>
+      )}
+
       <section className="summary-row">
         <article>
           <p className="label">Total Due</p>

@@ -4,6 +4,8 @@ function SettingsPage({
   borrowers, 
   transactions, 
   cycleAnchorDate, 
+  creditLimit,
+  onUpdateCreditLimit,
   onImportData 
 }) {
   const [file, setFile] = useState(null);
@@ -32,7 +34,8 @@ function SettingsPage({
           borrowers: data.borrowers,
           transactions: data.transactions,
           exportedAt: data.exportedAt,
-          cycleAnchorDate: data.cycleAnchorDate || new Date().toISOString()
+          cycleAnchorDate: data.cycleAnchorDate || new Date().toISOString(),
+          creditLimit: typeof data.creditLimit === 'number' ? data.creditLimit : 0
         });
       } catch (error) {
         setImportError('Invalid file format. Please select a valid export file.');
@@ -58,7 +61,8 @@ function SettingsPage({
       await onImportData({
         borrowers: preview.borrowers,
         transactions: preview.transactions,
-        cycleAnchorDate: preview.cycleAnchorDate
+        cycleAnchorDate: preview.cycleAnchorDate,
+        creditLimit: typeof preview.creditLimit === 'number' ? preview.creditLimit : 0
       });
       setImportSuccess('Data imported successfully!');
       setFile(null);
@@ -76,6 +80,7 @@ function SettingsPage({
       version: '1.0',
       exportedAt: new Date().toISOString(),
       cycleAnchorDate: cycleAnchorDate.toISOString(),
+      creditLimit: typeof creditLimit === 'number' ? creditLimit : 0,
       borrowers: [...borrowers],
       transactions: [...transactions]
     };
@@ -98,6 +103,33 @@ function SettingsPage({
           <h2>Data Management</h2>
           <p className="meta">Backup and transfer your data</p>
         </header>
+
+        <div className="settings-section">
+          <h3>Global Credit Limit</h3>
+          <p>Set the maximum total outstanding amount you are comfortable with for this shared account.</p>
+          <div style={{ margin: '0.75rem 0', maxWidth: '260px' }}>
+            <label className="field-label" htmlFor="credit-limit-input">
+              Total credit limit (₱)
+            </label>
+            <input
+              id="credit-limit-input"
+              type="number"
+              min="0"
+              step="100"
+              className="field-input"
+              value={creditLimit ?? 0}
+              onChange={(event) => {
+                const next = parseFloat(event.target.value);
+                const safeValue = Number.isNaN(next) || next < 0 ? 0 : next;
+                onUpdateCreditLimit(safeValue);
+              }}
+            />
+            <p className="hint">
+              Leave as 0 if you do not want to track a global limit. This value is shared across all users of this account.
+            </p>
+          </div>
+
+        </div>
 
         <div className="settings-section">
           <h3>Export Data</h3>

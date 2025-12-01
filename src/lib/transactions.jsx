@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'spaylater-transactions-v1';
 const BORROWERS_KEY = 'spaylater-borrowers-v1';
+const PAYMENTS_KEY = 'spaylater-payments-v1';
 
 const PAYMENT_PLAN_MONTHS = {
   bnpl: 1,
@@ -56,6 +57,27 @@ const saveBorrowers = (borrowers) => {
   }
 };
 
+const loadPayments = () => {
+  try {
+    const raw = window.localStorage.getItem(PAYMENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch (error) {
+    console.error('Failed to load payments from storage', error);
+    return [];
+  }
+};
+
+const savePayments = (payments) => {
+  try {
+    window.localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
+  } catch (error) {
+    console.error('Failed to save payments to storage', error);
+  }
+};
+
 export const useBorrowers = () => {
   const [borrowers, setBorrowers] = useState(() => loadBorrowers());
 
@@ -83,6 +105,50 @@ export const useBorrowers = () => {
   };
 
   return { borrowers, addBorrower, removeBorrower, replaceAllBorrowers };
+};
+
+export const usePayments = () => {
+  const [payments, setPayments] = useState(() => loadPayments());
+
+  useEffect(() => {
+    savePayments(payments);
+  }, [payments]);
+
+  const addPayment = async (payment) => {
+    if (!payment || !payment.borrower || !payment.cycleIndex) return;
+    const now = new Date().toISOString();
+    const newRecord = {
+      id: crypto.randomUUID(),
+      borrower: payment.borrower,
+      cycleIndex: payment.cycleIndex,
+      amount: Number(payment.amount) || 0,
+      date: payment.date,
+      method: payment.method || 'cash',
+      methodNote: payment.methodNote,
+      createdAt: now
+    };
+    if (!newRecord.amount) return;
+    setPayments((prev) => [...prev, newRecord]);
+  };
+
+  const editPayment = async (id, updates) => {
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              ...updates
+            }
+          : p
+      )
+    );
+  };
+
+  const deletePayment = async (id) => {
+    setPayments((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  return { payments, addPayment, editPayment, deletePayment };
 };
 
 export const useTransactions = () => {
@@ -115,6 +181,7 @@ export const useTransactions = () => {
       shares: Array.isArray(transaction.shares) ? transaction.shares : undefined,
       totalMonths,
       startCycleIndex,
+      description: transaction.description || '',
       createdAt: now,
       updatedAt: now
     };
@@ -128,7 +195,8 @@ export const useTransactions = () => {
           ? {
               ...tx,
               ...updates,
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date().toISOString(),
+              description: updates.description || tx.description
             }
           : tx
       )
@@ -156,6 +224,7 @@ export const useTransactions = () => {
       shares: Array.isArray(tx.shares) ? tx.shares : undefined,
       totalMonths: tx.totalMonths || 1,
       startCycleIndex: tx.startCycleIndex || 0,
+      description: tx.description || '',
       createdAt: tx.createdAt || new Date().toISOString(),
       updatedAt: tx.updatedAt || new Date().toISOString()
     }));

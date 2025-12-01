@@ -21,7 +21,8 @@ function TransactionsPage({
     borrower: 'Personal',
     paymentPlan: 'bnpl',
     monthlyPayment: '',
-    mode: 'single'
+    mode: 'single',
+    description: ''
   });
   const [shareRows, setShareRows] = useState([
     { borrower: 'Personal', amount: '' },
@@ -62,6 +63,7 @@ function TransactionsPage({
       const planMeta = paymentPlans.find((plan) => plan.value === tx.paymentPlan);
       const planLabel = (planMeta?.label || '').toLowerCase();
       const orderDate = (tx.orderDate || '').toLowerCase();
+      const description = (tx.description || '').toLowerCase();
 
       let sharedBorrowers = '';
       if (tx.mode === 'shared' && Array.isArray(tx.shares)) {
@@ -76,7 +78,8 @@ function TransactionsPage({
         borrower.includes(query) ||
         sharedBorrowers.includes(query) ||
         planLabel.includes(query) ||
-        orderDate.includes(query)
+        orderDate.includes(query) ||
+        description.includes(query)
       );
     });
   }, [filteredTransactions, searchQuery, paymentPlans]);
@@ -114,16 +117,13 @@ function TransactionsPage({
 
   const handleSplitEvenly = () => {
     if (!formState.monthlyPayment) return;
-    
     const monthlyAmount = parseFloat(formState.monthlyPayment);
     if (isNaN(monthlyAmount) || monthlyAmount <= 0) return;
-    
     const shareAmount = (monthlyAmount / shareRows.length).toFixed(2);
     const updatedRows = shareRows.map(row => ({
       ...row,
       amount: shareAmount
     }));
-    
     setShareRows(updatedRows);
   };
 
@@ -139,7 +139,8 @@ function TransactionsPage({
       amount: parsedAmount,
       orderDate: formState.orderDate,
       paymentPlan: formState.paymentPlan,
-      monthlyPayment: formState.monthlyPayment ? parseFloat(formState.monthlyPayment) : undefined
+      monthlyPayment: formState.monthlyPayment ? parseFloat(formState.monthlyPayment) : undefined,
+      description: formState.description || ''
     };
 
     if (formState.mode === 'shared') {
@@ -195,7 +196,8 @@ function TransactionsPage({
       borrower: 'Personal',
       paymentPlan: 'bnpl',
       monthlyPayment: '',
-      mode: 'single'
+      mode: 'single',
+      description: ''
     });
     setShareRows([]);
     setIsAddModalOpen(false);
@@ -217,7 +219,8 @@ function TransactionsPage({
       orderDate: transaction.orderDate?.slice(0, 10) ?? todayLabel,
       borrower: transaction.borrower ?? 'Personal',
       paymentPlan: transaction.paymentPlan ?? 'bnpl',
-      monthlyPayment: transaction.monthlyPayment ? String(transaction.monthlyPayment) : ''
+      monthlyPayment: transaction.monthlyPayment ? String(transaction.monthlyPayment) : '',
+      description: transaction.description || ''
     });
   };
 
@@ -242,7 +245,8 @@ function TransactionsPage({
       orderDate: editFormState.orderDate,
       borrower: editFormState.borrower,
       paymentPlan: editFormState.paymentPlan,
-      monthlyPayment: parsedMonthly
+      monthlyPayment: parsedMonthly,
+      description: editFormState.description || ''
     });
 
     handleCloseEdit();
@@ -264,16 +268,14 @@ function TransactionsPage({
           </div>
           <div className="filters-row">
             <button type="button" className="add-transaction-btn" onClick={handleOpenAddModal}>
-              ＋ Add
+              + Add
             </button>
             <div className="select-control">
               <span className="label">Borrower</span>
               <select value={borrowerFilter} onChange={(event) => setBorrowerFilter(event.target.value)}>
                 <option value="all">All</option>
                 {borrowers.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
+                  <option key={b} value={b}>{b}</option>
                 ))}
               </select>
             </div>
@@ -282,9 +284,7 @@ function TransactionsPage({
               <select value={planFilter} onChange={(event) => setPlanFilter(event.target.value)}>
                 <option value="all">All</option>
                 {paymentPlans.map((plan) => (
-                  <option key={plan.value} value={plan.value}>
-                    {plan.label}
-                  </option>
+                  <option key={plan.value} value={plan.value}>{plan.label}</option>
                 ))}
               </select>
             </div>
@@ -308,7 +308,6 @@ function TransactionsPage({
               const totalMonths = planMeta?.months || (transaction.paymentPlan === 'bnpl' ? 1 : 1);
               const isInstallment = transaction.paymentPlan !== 'bnpl' && totalMonths > 1;
               const amountForCycle = isInstallment ? transaction.monthlyPayment || transaction.amount : transaction.amount;
-
               const isShared = transaction.mode === 'shared' && Array.isArray(transaction.shares);
 
               let progressLabel = null;
@@ -327,21 +326,30 @@ function TransactionsPage({
                   onClick={isShared ? undefined : () => handleOpenEdit(transaction)}
                 >
                   <div className="transaction-header">
-                    <h3>{transaction.productName}</h3>
+                    <div className="transaction-title-block">
+                      <h3>{transaction.productName}</h3>
+                      {transaction.description && (
+                        <p className="meta transaction-description">{transaction.description}</p>
+                      )}
+                    </div>
                     <span className="badge">{planMeta?.label || '—'}</span>
                   </div>
-                  <p className="amount">{formatCurrency(amountForCycle)}</p>
-                  <p className="borrower">
-                    {isShared && transaction.shares
-                      ? `Shared: ${transaction.shares
-                          .map((share) => `${share.borrower} (${formatCurrency(share.amountPerCycle)})`)
-                          .join(' • ')}`
-                      : transaction.borrower}
-                  </p>
-                  <p className="meta">Ordered on {new Date(transaction.orderDate).toLocaleDateString()}</p>
-                  {progressLabel && (
-                    <p className="meta installment-progress">Installment: {progressLabel}</p>
-                  )}
+                  <div className="transaction-footer">
+                    <div className="transaction-footer-main">
+                      <p className="borrower">
+                        {isShared && transaction.shares
+                          ? `Shared: ${transaction.shares
+                              .map((share) => `${share.borrower} (${formatCurrency(share.amountPerCycle)})`)
+                              .join(' • ')}`
+                          : transaction.borrower}
+                      </p>
+                      <p className="meta">Ordered on {new Date(transaction.orderDate).toLocaleDateString()}</p>
+                      {progressLabel && (
+                        <p className="meta installment-progress">Installment: {progressLabel}</p>
+                      )}
+                    </div>
+                    <p className="amount">{formatCurrency(amountForCycle)}</p>
+                  </div>
                 </article>
               );
             })
@@ -357,9 +365,7 @@ function TransactionsPage({
             >
               Previous
             </button>
-            <span className="meta">
-              Page {currentPage} of {totalPages}
-            </span>
+            <span className="meta">Page {currentPage} of {totalPages}</span>
             <button
               type="button"
               className="secondary small"
@@ -371,6 +377,15 @@ function TransactionsPage({
           </div>
         )}
       </section>
+
+      <button
+        type="button"
+        className="fab-add-transaction"
+        onClick={handleOpenAddModal}
+        aria-label="Add transaction"
+      >
+        +
+      </button>
 
       {isAddModalOpen && (
         <div className="modal-backdrop" onClick={handleCloseAddModal}>
@@ -408,6 +423,13 @@ function TransactionsPage({
                 />
               </label>
               <label>
+                Description
+                <input
+                  value={formState.description || ''}
+                  onChange={(event) => setFormState({ ...formState, description: event.target.value })}
+                />
+              </label>
+              <label>
                 Amount
                 <input
                   type="number"
@@ -434,23 +456,21 @@ function TransactionsPage({
                     onChange={(event) => setFormState({ ...formState, borrower: event.target.value })}
                   >
                     {borrowers.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
+                      <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
                 </label>
               ) : (
                 <div className="shared-borrowers">
                   <div className="shared-borrower-actions">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className="secondary small"
                       onClick={() => setShareRows([...shareRows, { borrower: 'Personal', amount: '' }])}
                     >
-                      ＋ Add Borrower
+                      + Add Borrower
                     </button>
-                    <button 
+                    <button
                       type="button"
                       className="secondary small"
                       onClick={handleSplitEvenly}
@@ -470,9 +490,7 @@ function TransactionsPage({
                         }}
                       >
                         {borrowers.map((b) => (
-                          <option key={b} value={b}>
-                            {b}
-                          </option>
+                          <option key={b} value={b}>{b}</option>
                         ))}
                       </select>
                       <input
@@ -501,17 +519,15 @@ function TransactionsPage({
                           }
                         }}
                       >
-                        ✕
+                        X
                       </button>
                     </div>
                   ))}
                   {formState.paymentPlan && (
-                    <div className={`shared-summary ${
-                      shareRows.some(r => !r.amount) ? 'invalid' : 'valid'
-                    }`}>
-                      {shareRows.some(r => !r.amount) 
+                    <div className={`shared-summary ${shareRows.some(r => !r.amount) ? 'invalid' : 'valid'}`}>
+                      {shareRows.some(r => !r.amount)
                         ? 'Please fill in all amounts'
-                        : `Total: ₱${shareRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0).toFixed(2)}`}
+                        : `Total: ${formatCurrency(shareRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0))}`}
                     </div>
                   )}
                 </div>
@@ -523,9 +539,7 @@ function TransactionsPage({
                   onChange={(event) => setFormState({ ...formState, paymentPlan: event.target.value })}
                 >
                   {paymentPlans.map((plan) => (
-                    <option key={plan.value} value={plan.value}>
-                      {plan.label}
-                    </option>
+                    <option key={plan.value} value={plan.value}>{plan.label}</option>
                   ))}
                 </select>
               </label>
@@ -542,26 +556,17 @@ function TransactionsPage({
                   />
                 </label>
               )}
-              {formState.paymentPlan !== 'bnpl' && formState.monthlyPayment && (
-                (() => {
-                  const preview = computeInterestPreview(
-                    formState.amount,
-                    formState.monthlyPayment,
-                    formState.paymentPlan
-                  );
-                  if (!preview) return null;
-                  return (
-                    <p className="meta interest-preview">
-                      Interest: {formatCurrency(preview.totalInterest)} ({preview.percent.toFixed(2)}%) • Total paid:
-                      {` ${formatCurrency(preview.totalPaid)}`}
-                    </p>
-                  );
-                })()
-              )}
+              {formState.paymentPlan !== 'bnpl' && formState.monthlyPayment && (() => {
+                const preview = computeInterestPreview(formState.amount, formState.monthlyPayment, formState.paymentPlan);
+                if (!preview) return null;
+                return (
+                  <p className="meta interest-preview">
+                    Interest: {formatCurrency(preview.totalInterest)} ({preview.percent.toFixed(2)}%) - Total paid: {formatCurrency(preview.totalPaid)}
+                  </p>
+                );
+              })()}
               <div className="modal-actions">
-                <button type="button" className="secondary" onClick={handleCloseAddModal}>
-                  Cancel
-                </button>
+                <button type="button" className="secondary" onClick={handleCloseAddModal}>Cancel</button>
                 <button type="submit">Save Transaction</button>
               </div>
             </form>
@@ -578,10 +583,15 @@ function TransactionsPage({
                 Product Name
                 <input
                   value={editFormState.productName}
-                  onChange={(event) =>
-                    setEditFormState({ ...editFormState, productName: event.target.value })
-                  }
+                  onChange={(event) => setEditFormState({ ...editFormState, productName: event.target.value })}
                   required
+                />
+              </label>
+              <label>
+                Description
+                <input
+                  value={editFormState.description || ''}
+                  onChange={(event) => setEditFormState({ ...editFormState, description: event.target.value })}
                 />
               </label>
               <label>
@@ -590,9 +600,7 @@ function TransactionsPage({
                   type="number"
                   step="0.01"
                   value={editFormState.amount}
-                  onChange={(event) =>
-                    setEditFormState({ ...editFormState, amount: event.target.value })
-                  }
+                  onChange={(event) => setEditFormState({ ...editFormState, amount: event.target.value })}
                   required
                 />
               </label>
@@ -601,9 +609,7 @@ function TransactionsPage({
                 <input
                   type="date"
                   value={editFormState.orderDate}
-                  onChange={(event) =>
-                    setEditFormState({ ...editFormState, orderDate: event.target.value })
-                  }
+                  onChange={(event) => setEditFormState({ ...editFormState, orderDate: event.target.value })}
                   required
                 />
               </label>
@@ -611,14 +617,10 @@ function TransactionsPage({
                 Borrower
                 <select
                   value={editFormState.borrower}
-                  onChange={(event) =>
-                    setEditFormState({ ...editFormState, borrower: event.target.value })
-                  }
+                  onChange={(event) => setEditFormState({ ...editFormState, borrower: event.target.value })}
                 >
                   {borrowers.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
+                    <option key={b} value={b}>{b}</option>
                   ))}
                 </select>
               </label>
@@ -626,14 +628,10 @@ function TransactionsPage({
                 Payment Plan
                 <select
                   value={editFormState.paymentPlan}
-                  onChange={(event) =>
-                    setEditFormState({ ...editFormState, paymentPlan: event.target.value })
-                  }
+                  onChange={(event) => setEditFormState({ ...editFormState, paymentPlan: event.target.value })}
                 >
                   {paymentPlans.map((plan) => (
-                    <option key={plan.value} value={plan.value}>
-                      {plan.label}
-                    </option>
+                    <option key={plan.value} value={plan.value}>{plan.label}</option>
                   ))}
                 </select>
               </label>
@@ -645,36 +643,23 @@ function TransactionsPage({
                     step="0.01"
                     min="0"
                     value={editFormState.monthlyPayment}
-                    onChange={(event) =>
-                      setEditFormState({ ...editFormState, monthlyPayment: event.target.value })
-                    }
+                    onChange={(event) => setEditFormState({ ...editFormState, monthlyPayment: event.target.value })}
                     required
                   />
                 </label>
               )}
-              {editFormState.paymentPlan !== 'bnpl' && editFormState.monthlyPayment && (
-                (() => {
-                  const preview = computeInterestPreview(
-                    editFormState.amount,
-                    editFormState.monthlyPayment,
-                    editFormState.paymentPlan
-                  );
-                  if (!preview) return null;
-                  return (
-                    <p className="meta interest-preview">
-                      Interest: {formatCurrency(preview.totalInterest)} ({preview.percent.toFixed(2)}%) • Total paid:
-                      {` ${formatCurrency(preview.totalPaid)}`}
-                    </p>
-                  );
-                })()
-              )}
+              {editFormState.paymentPlan !== 'bnpl' && editFormState.monthlyPayment && (() => {
+                const preview = computeInterestPreview(editFormState.amount, editFormState.monthlyPayment, editFormState.paymentPlan);
+                if (!preview) return null;
+                return (
+                  <p className="meta interest-preview">
+                    Interest: {formatCurrency(preview.totalInterest)} ({preview.percent.toFixed(2)}%) - Total paid: {formatCurrency(preview.totalPaid)}
+                  </p>
+                );
+              })()}
               <div className="modal-actions">
-                <button type="button" className="danger" onClick={handleDelete}>
-                  Delete
-                </button>
-                <button type="button" className="secondary" onClick={handleCloseEdit}>
-                  Cancel
-                </button>
+                <button type="button" className="danger" onClick={handleDelete}>Delete</button>
+                <button type="button" className="secondary" onClick={handleCloseEdit}>Cancel</button>
                 <button type="submit">Save Changes</button>
               </div>
             </form>
